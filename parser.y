@@ -1,0 +1,458 @@
+﻿%namespace GPLexTutorial
+
+%{
+public static AST.CompilationUnit root;
+%}
+
+%union
+{
+	public AST.CompilationUnit compilationUnit;
+	public AST.PackageDeclaration packageDeclaration;
+	public List<AST.ImportDeclaration> importDeclarations;
+	public List<AST.TypeDeclaration> typeDeclarations;
+	public AST.ClassDeclaration classDeclaration;
+	public List<AST.Declaration> declarations;
+	public AST.Declaration declaration;
+	public AST.MethodHeader methodHeader;
+	public AST.MethodDeclarator methodDeclarator;
+	
+	public List<AST.Parameter> parameters;
+	public AST.Parameter parameter;	
+	public List<AST.Modifier> modifiers;
+	public AST.Modifier modifier;
+	public AST.Type ASTtype;
+	public AST.NamedType namedType;
+	public AST.CompoundStatement compoundStatement;
+	public List<AST.Statement> statements;
+	public AST.Statement statement;
+	public AST.Expression expression;
+
+    public int num;
+    public string name;
+	public List<Tuple<string, AST.ExpressionStatement>> variableDeclarators;
+	public Tuple<string, AST.ExpressionStatement> variableDeclarator;
+	public float floatVal;
+	public char character;
+	public string stringLiteral;
+}
+
+%token <num> INTEGER_LITERAL
+%token <floatVal> FLOAT_LITERAL
+%token <name> IDENT
+%token <character> CHARACTER
+%token <name> STRING_LITERAL
+
+%token ABSTRACT ASSERT BOOLEAN BREAK BYTE CASE CATCH CHAR CLASS CONST
+       CONTINUE DEFAULT DO DOUBLE ELSE ENUM EXTENDS FINAL FINALLY FLOAT      
+       FOR IF GOTO IMPLEMENTS IMPORT INSTANCEOF INT
+       INTERFACE LONG NATIVE NEW PACKAGE PRIVATE PROTECTED PUBLIC
+       RETURN SHORT STATIC STRICTFP SUPER SWITCH SYNCHRONIZED THIS
+	   THROW THROWS TRANSIENT TRY VOID VOLATILE WHILE '_'
+
+%token TRUE FALSE NULL
+
+/*-------------------------------------------------SEPARATORS--------------------------------------------------------------------------*/
+%token SEPARATOR_ONE SEPARATOR_TWO
+/*--------------------------------------------------------------------------------------------------------------------------------------*/
+
+/*--------------OPERATOR TOKENS----------------------------------------------------------------------------------------------------------*/
+%token <name> LAMBDA EQUALS GEQ LEQ NOT_EQUALS LOGICAL_AND OR INCREMENT DECREMENT
+%token <name> LEFT_SHIFT RIGHT_SHIFT ZERO_FILL_RIGHT_SHIFT ADD_RIGHT_OP SUB_RIGHT_OP MULTI_RIGHT_OP DIV_RIGHT_OP 
+%token <name> AND_ASSIGNMENT OR_ASSIGNMENT EXCLUSIVE_ASSIGNMENT MODULUS_ASSIGNMENT LSHIFT_ASSIGNMENT RSHIFT_ASSIGNMENT ZRSHIFT_ASSIGNMENT
+
+
+
+%type <compilationUnit> CompilationUnit, OrdinaryCompilationUnit
+%type <typeDeclarations> TypeDeclarations
+%type <classDeclaration> TypeDeclaration, ClassDeclaration, NormalClassDeclaration
+%type <packageDeclaration> PackageDeclarationOpt
+%type <importDeclarations> ImportDeclarations
+%type <declaration> MethodDeclaration, ClassMemberDeclaration, ClassBodyDeclaration
+%type <declarations> ClassBody, ClassBodyDeclarations
+%type <methodHeader> MethodHeader
+%type <ASTtype> Result, UnannType, UnannPrimitiveType, UnannReferenceType, NumericType, IntegralType, UnannArrayType
+%type <namedType> UnannTypeVariable
+%type <methodDeclarator> MethodDeclarator
+%type <parameters> FormalParameters, FormalParameterWithCommas
+%type <parameter> FormalParameter, FormalParameterWithComma
+%type <modifiers> Modifiers
+%type <modifier> Modifier
+%type <variableDeclarators> VariableDeclaratorList, VariableDeclaratorWithCommas
+%type <variableDeclarator> VariableDeclarator, VariableDeclaratorWithComma
+%type <name> VariableDeclaratorId
+%type <compoundStatement> MethodBody, Block
+%type <statements>  BlockStatements BlockStatements
+%type <statement>	BlockStatement, Statement, StatementWithoutTrailingSubstatement, LocalVariableDeclarationStatement,
+					LocalVariableDeclaration, ExpressionStatement, IfThenStatement, IfThenElseStatement, StatementNoShortIf, 
+					IfThenElseStatementNoShortIf, WhileStatement, ReturnStatement
+%type <expression>	StatementExpression, Assignment, LeftHandSide, Expression, AssignmentExpression, Literal, ExpressionName, 
+					ConditionalExpression, ConditionalOrExpression, ConditionalAndExpression, InclusiveOrExpression,
+					ExclusiveOrExpression, AndExpression, EqualityExpression, RelationalExpression,
+					ShiftExpression, AdditiveExpression, MultiplicativeExpression, UnaryExpression,
+					UnaryExpressionNotPlusMinus, PostfixExpression, Primary, PrimaryNoNewArray, VariableInitializer
+
+%type <name> AssignmentOperator, PlusOperator, SubtractOperator, MultiplicationOperator, DivisionOperator, ModulusOperator
+
+/*%left '='        Assignment operators are right associative. Let's try with %right and see how it goes. Read this https://introcs.cs.princeton.edu/java/11precedence/ */
+%right		LAMBDA
+%left		EQUALS
+%nonassoc   GEQ
+%nonassoc   LEQ
+%left	    NOT_EQUALS
+%left		LOGICAL_AND
+%left	    OR
+%right	    INCREMENT
+%right	    DECREMENT
+%left	    LEFT_SHIFT
+%left	    RIGHT_SHIFT
+%left	    ZERO_FILL_SHIFT
+%right	    ADD_RIGHT_OP
+%right	    SUB_RIGHT_OP
+%right	    MULTI_RIGHT_OP
+%right	    DIV_RIGHT_OP
+%right	    AND_ASSIGNMENT
+%right	    OR_ASSIGNMENT
+%right		EXCLUSIVE_ASSIGNMENT
+%right		MODULUS_ASSIGNMENT
+%right		LSHIFT_ASSIGNMENT
+%right		RSHIFT_ASSIGNMENT
+%right		ZRSHIFT_ASSIGNMENT
+%right '='
+%nonassoc '>'
+%nonassoc '<'
+%right '!'
+%right '~'
+%right '?'
+%right '?'
+%left '+'
+%left '-'
+%left '*'
+%left '/'
+%left '&'
+%left '|'
+%left '^'
+%left '%'
+/*---------------------------------------------------------------------------------------------------------------------------------------*/
+
+%%
+
+Program: CompilationUnit                                                                { root = $1; }                       
+       ;
+
+CompilationUnit: OrdinaryCompilationUnit                                                { $$ = $1; }
+			   ;
+			   
+OrdinaryCompilationUnit: PackageDeclarationOpt ImportDeclarations TypeDeclarations      { $$ = new AST.CompilationUnit($1, $2, $3); }
+					   ;
+
+PackageDeclarationOpt: /* Empty */                                                      { $$ = new AST.PackageDeclaration(); }
+					 ;
+					 
+ImportDeclarations: /* Empty */                                                         { $$ = new List<AST.ImportDeclaration>(); }
+				  ;
+
+TypeDeclarations: TypeDeclaration TypeDeclarations                                      { $$ = $2; $$.Add($2); }
+				| /* Empty */                                                           { $$ = new List<AST.TypeDeclaration>(); }
+				;
+				
+TypeDeclaration: ClassDeclaration                                                       { $$ = $1; }  
+			   ;
+				
+ClassDeclaration: NormalClassDeclaration                                                { $$ = $1; }
+				;
+
+NormalClassDeclaration: Modifiers CLASS IDENT TypeParametersOpt SuperclassOpt SuperinterfacesOpt ClassBody   { $$ = new AST.ClassDeclaration($1, $3, $7); }
+					  ;
+					  
+Modifiers: Modifiers Modifier														    { $$ = $1; $$.Add($2); }
+	     | /* Empty */																    { $$ = new List<AST.Modifier>(); }
+	     ;
+
+Modifier     : PUBLIC                                                                   { $$ = AST.Modifier.PUBLIC; }
+			 | PROTECTED                                                                { $$ = AST.Modifier.PROTECTED; }
+		     | PRIVATE                                                                  { $$ = AST.Modifier.PRIVATE; }
+			 | ABSTRACT                                                                 { $$ = AST.Modifier.ABSTRACT; }
+			 | STATIC                                                                   { $$ = AST.Modifier.STATIC; }
+			 | FINAL                                                                    { $$ = AST.Modifier.FINAL; }                                                                { $$ = AST.Modifier.STATIC; }
+			 ;
+
+TypeParametersOpt: /* Empty */                                                                       
+                 ;
+
+SuperclassOpt: /* Empty */
+             ;
+
+SuperinterfacesOpt: /* Empty */
+                  ;
+
+ClassBody: '{' ClassBodyDeclarations '}'                                                { $$ = $2; } 
+         ;
+
+ClassBodyDeclarations: ClassBodyDeclarations ClassBodyDeclaration                       { $$ = $1; $$.Add($2); }
+				     | /* Empty */                                                      { $$ = new List<AST.Declaration>(); }
+					 ;
+					  
+ClassBodyDeclaration: ClassMemberDeclaration                                            { $$ = $1; }
+					;
+					
+ClassMemberDeclaration: MethodDeclaration                                               { $$ = $1; }
+					  ;
+					   
+MethodDeclaration: Modifiers MethodHeader MethodBody                                    { $$ = new AST.MethodDeclaration($1, $2, $3); }
+		         ;				 
+
+MethodHeader: Result MethodDeclarator ThrowsOpt                                         { $$ = new AST.MethodHeader($1, $2); } 
+	        ;
+
+Result: UnannType                                                                       { $$ = $1; }
+      | VOID                                                                            { $$ = new AST.VoidType(); }
+      ;
+
+UnannType: UnannPrimitiveType                                                           { $$ = $1; }
+         | UnannReferenceType                                                           { $$ = $1; }
+         ;
+		 
+UnannPrimitiveType: NumericType                                                         { $$ = $1; }
+                  ;
+				  
+NumericType: IntegralType																{ $$ = $1; }
+           ;
+
+IntegralType: INT																		{ $$ = new AST.IntType(); }
+            ;
+
+UnannReferenceType: UnannArrayType														{ $$ = $1; }
+				  | UnannTypeVariable                                                   { $$ = $1; }
+                  ;
+
+UnannArrayType: UnannTypeVariable Dims                                                  { $$ = new AST.ArrayType($1); }
+              ;
+
+UnannTypeVariable: IDENT                                                                { $$ = new AST.NamedType($1); }
+                 ;
+
+Dims : Dim Dims																			
+     | Dim
+	 ;
+
+Dim: '[' ']'
+   ;
+
+MethodDeclarator: IDENT '(' FormalParameters ')' DimsOpt							    { $$ = new AST.MethodDeclarator($1, $3); }
+		        ;			
+
+FormalParameters   : FormalParameter FormalParameterWithCommas                          { $$ = $2; $$.Add($1); }
+				   | /* Empty */                                                        { $$ = new List<AST.Parameter>();}
+		           ;
+
+FormalParameterWithCommas: FormalParameterWithCommas FormalParameterWithComma           { $$ = $1; $$.Add($2);}
+                         | /* Empty */                                                  { $$ = new List<AST.Parameter>();}
+                         ;
+
+FormalParameterWithComma: ',' FormalParameter                                           { $$ = $2;}
+                        ;
+
+FormalParameter: Modifiers UnannType VariableDeclaratorId                               { $$ = new AST.Parameter($1, $2, $3); }
+			   ;
+
+VariableDeclaratorId: IDENT DimsOpt                                                     { $$ = $1; }
+                    ;
+
+ThrowsOpt: /* Empty */
+         ;
+
+MethodBody: Block                                                                       { $$ = $1; }
+	      ;
+		  
+Block:	'{' BlockStatements '}'														    { $$ = new AST.CompoundStatement($2); }
+     ;
+	 			  
+BlockStatements: BlockStatements BlockStatement											{ $$ = $1; $$.Add($2);}
+               | /* Empty */                                                            { $$ = new List<AST.Statement>(); }
+               ;
+			   
+BlockStatement: Statement                                                               { $$ = $1; }
+	          | LocalVariableDeclarationStatement                                       { $$ = $1; }
+			  ;
+			  
+LocalVariableDeclarationStatement: LocalVariableDeclaration ';'                         { $$ = $1; }
+				                 ;
+				 
+LocalVariableDeclaration: UnannType VariableDeclaratorList								{ var tempList = new List<AST.LocalVariableDeclaration>();
+																						  foreach(var variableDecl in $2)
+																						  {
+																							tempList.Add(new AST.LocalVariableDeclaration($1, variableDecl.Item1, variableDecl.Item2));
+																						  }
+																						  $$ = new AST.LocalVariableDeclarationStatementList(new List<AST.Modifier>(), tempList);
+																						}
+						| Modifiers UnannType VariableDeclaratorList                        												 
+						;
+
+VariableDeclaratorList: VariableDeclarator VariableDeclaratorWithCommas                 { $$ = $2; $$.Add($1);}
+                      ;
+
+VariableDeclaratorWithCommas: VariableDeclaratorWithCommas VariableDeclaratorWithComma  { $$ = $1; $$.Add($2);}
+                            | /* Empty */                                               { $$ = new List<Tuple<string, AST.ExpressionStatement>>();}
+                            ;
+
+VariableDeclaratorWithComma: ',' VariableDeclarator                                     { $$ = $2; }
+                           ;
+
+VariableDeclarator: VariableDeclaratorId					                            { $$ = new Tuple<string, AST.ExpressionStatement>($1, null); }
+				  | VariableDeclaratorId '=' VariableInitializer                        { 
+																							var identExp = new AST.IdentifierExpression($1);
+																							var exprStatement = new AST.ExpressionStatement(new AST.AssignmentExpression(identExp, "=", $3));
+																							$$ = new Tuple<string, AST.ExpressionStatement>($1, exprStatement); 
+																						}
+                  ;
+
+DimsOpt: /* Empty */
+       ;
+
+VariableInitializer: Expression                                                         { $$ = $1; }
+				   ;
+
+
+Statement: StatementWithoutTrailingSubstatement                                         { $$ = $1; }
+	     | IfThenStatement																{ $$ = $1; }
+		 | IfThenElseStatement															{ $$ = $1; }
+		 | WhileStatement																{ $$ = $1;}
+		 ;
+
+WhileStatement: WHILE '(' Expression ')' Statement										{ $$ = new AST.WhileStatement($3,$5); }
+			  ;
+
+IfThenStatement: IF '(' Expression ')' Statement										{ $$ = new AST.IfThenStatement($3,$5,null); }		
+				;
+
+IfThenElseStatement: IF '(' Expression ')' StatementNoShortIf ELSE Statement			{ $$ = new AST.IfThenElseStatement($3,$5,$7); }	
+					;
+
+StatementNoShortIf: IfThenElseStatementNoShortIf										{ $$ = $1; }
+				  | StatementWithoutTrailingSubstatement								{ $$ = $1; }
+				  ;
+
+IfThenElseStatementNoShortIf: IF '(' Expression ')' StatementNoShortIf ELSE StatementNoShortIf	{ $$ = new AST.IfThenElseStatement($3,$5,$7); }	
+							;
+	
+
+StatementWithoutTrailingSubstatement: ExpressionStatement                               { $$ = $1; }
+									| Block                                             { $$ = $1; } 
+									| ReturnStatement									{ $$ = $1; } 
+									;
+
+ReturnStatement: RETURN Expression ';'													{ $$ = new AST.ReturnStatement($2); }
+			   | RETURN ';'                                                             { $$ = new AST.ReturnStatement(null); }
+			   ;
+			   
+ExpressionStatement: StatementExpression ';'                                            { $$ = new AST.ExpressionStatement($1); }
+		           ;
+				   
+StatementExpression: Assignment 		                                                { $$ = $1; }
+		           ;
+				   				   
+Assignment: LeftHandSide AssignmentOperator Expression                                  { $$ = new AST.AssignmentExpression($1, $2, $3); }
+	      ;
+		  
+LeftHandSide: ExpressionName                                                            { $$ = $1; }
+            ;		  
+
+ExpressionName: IDENT																	{ $$ = new AST.IdentifierExpression($1); }
+	      ;			
+		  
+AssignmentOperator: '='                                                                 { $$ = "="; }
+                  ;
+
+PlusOperator: '+'                                                                       { $$ = "+"; }
+            ;
+
+SubtractOperator: '-'                                                                   { $$ = "-"; }
+                ;
+
+MultiplicationOperator: '*'                                                             { $$ = "*"; }
+                      ;
+
+DivisionOperator: '/'                                                                   { $$ = "/"; }
+                ;
+
+ModulusOperator: '%'                                                                    { $$ = "%"; }
+               ;
+			
+Expression: AssignmentExpression                                                        { $$ = $1; }
+	      ;
+
+AssignmentExpression: ConditionalExpression                                             { $$ = $1; }
+                    | Assignment                                                        { $$ = $1; }
+					;
+					
+ConditionalExpression: ConditionalOrExpression                                          { $$ = $1; }
+                     ;
+					
+ConditionalOrExpression: ConditionalAndExpression										{ $$ = $1; }
+                       ;
+		 
+ConditionalAndExpression: InclusiveOrExpression											{ $$ = $1; }
+                        ;
+						
+InclusiveOrExpression: ExclusiveOrExpression											{ $$ = $1; }
+                     ;
+					 
+ExclusiveOrExpression: AndExpression													{ $$ = $1; }
+                     ;
+					 
+AndExpression: EqualityExpression														{ $$ = $1; }
+             ;
+			 
+EqualityExpression: RelationalExpression												{ $$ = $1; }
+				  |	EqualityExpression EQUALS RelationalExpression						{ $$ = new AST.BinaryExpression($1, "==", $3); }
+				  | EqualityExpression NOT_EQUALS RelationalExpression					{ $$ = new AST.BinaryExpression($1, "!=", $3); }
+                  ;
+				  
+RelationalExpression: ShiftExpression													{ $$ = $1; }
+					| RelationalExpression '<' ShiftExpression							{ $$ = new AST.BinaryExpression($1, "<", $3); }
+					| RelationalExpression '>' ShiftExpression							{ $$ = new AST.BinaryExpression($1, ">", $3); }
+					| RelationalExpression LEQ ShiftExpression							{ $$ = new AST.BinaryExpression($1, "<=", $3); }
+					| RelationalExpression GEQ ShiftExpression							{ $$ = new AST.BinaryExpression($1, ">=", $3); }
+                    ;
+
+ShiftExpression: AdditiveExpression														{ $$ = $1; }
+               ;
+
+AdditiveExpression: MultiplicativeExpression											{ $$ = $1; }
+				  | AdditiveExpression PlusOperator MultiplicativeExpression		    { $$ = new AST.BinaryExpression($1, $2 , $3); }
+				  | AdditiveExpression SubtractOperator MultiplicativeExpression		{ $$ = new AST.BinaryExpression($1, $2 , $3); }
+                  ;
+
+MultiplicativeExpression: UnaryExpression												     { $$ = $1; }
+						| MultiplicativeExpression MultiplicationOperator UnaryExpression    { $$ = new AST.BinaryExpression($1, $2 , $3); }
+						| MultiplicativeExpression DivisionOperator UnaryExpression          { $$ = new AST.BinaryExpression($1, $2 , $3); }
+						| MultiplicativeExpression ModulusOperator UnaryExpression           { $$ = new AST.BinaryExpression($1, $2 , $3); }
+                        ;
+
+UnaryExpression: PlusOperator UnaryExpression											{ $$ = $2; }
+               | UnaryExpressionNotPlusMinus											{ $$ = $1; }
+			   ;
+				
+UnaryExpressionNotPlusMinus: PostfixExpression											{ $$ = $1; }
+                           ;
+
+PostfixExpression: Primary																{ $$ = $1; }
+				 | ExpressionName														{ $$ = $1; }
+                 ;
+
+Primary: PrimaryNoNewArray																{ $$ = $1; }
+       ;
+
+PrimaryNoNewArray: Literal																{ $$ = $1; }
+                 ;
+
+Literal: INTEGER_LITERAL																{ $$ = new AST.IntegerLiteralExpression($1); }
+       | STRING_LITERAL                                                                 { $$ = new AST.StringLiteralExpression($1); }
+	   ;				
+	   
+%%
+
+public Parser(Scanner scanner) : base(scanner)
+{
+}
+

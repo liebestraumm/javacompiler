@@ -1,0 +1,20 @@
+.assembly Test {}
+
+.class public HelloWorld
+{
+	.method public static void Main(string[] args)
+	{
+		.entrypoint 
+		.locals init ([0] int32 x, [1] int32 t, [2] int32 z, [3] int32 y, [4] string a)
+		ldc.i4 20
+		dup
+		stloc 1
+		pop
+		ldc.i4 10
+		dup
+		stloc 2
+		pop
+		ret
+	}
+
+}
